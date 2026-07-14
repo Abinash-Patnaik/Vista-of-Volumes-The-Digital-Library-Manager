@@ -97,9 +97,12 @@ It also automatically generates the following default accounts for you:
 
 ---
 
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! 
-Feel free to check [issues page](https://github.com/your-username/digital-library-manager/issues) if you want to contribute.
-
 ## 📝 License
 This project is open-source and available under the [MIT License](LICENSE).
+
+---
+<div align="center">
+
+Made with ❤️ by **ABINASH PATNAIK**  
+
+</div>
