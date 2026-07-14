@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - Digital Library</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+    <script src="/static/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+    <style>
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #fff; padding: 2rem; border-radius: 12px;
+            width: 90%; max-width: 400px; color: #333;
+        }
+        .modal-content h2 { margin-top: 0; color: #333; }
+        .modal-content input { width: 100%; margin-bottom: 1rem; padding: 0.8rem; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        .modal-content .modal-btns { display: flex; gap: 1rem; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <div id="passwordModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Change Password</h2>
+            <input type="password" id="oldPassword" placeholder="Old Password">
+            <input type="password" id="newPassword" placeholder="New Password">
+            <div class="modal-btns">
+                <button onclick="closePasswordModal()" style="background: #ccc; color: #333;">Cancel</button>
+                <button onclick="submitPasswordChange()">Change</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="registerAdminModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Register Admin</h2>
+            <input type="text" id="adminName" placeholder="Name">
+            <input type="email" id="adminEmail" placeholder="Email">
+            <input type="password" id="adminPassword" placeholder="Password">
+            <div class="modal-btns">
+                <button onclick="closeRegisterAdminModal()" style="background: #ccc; color: #333;">Cancel</button>
+                <button onclick="submitRegisterAdmin()">Register</button>
+            </div>
+        </div>
+    </div>
+    <header>
+        <h1>Digital Library (Admin)</h1>
+        <nav>
+            <span style="margin-right: 15px;">Admin Dashboard</span>
+            <button onclick="openPasswordModal()" style="margin-right: 10px;">Change Password</button>
+            <button onclick="openRegisterAdminModal()" style="margin-right: 10px;">Register Admin</button>
+            <button onclick="logout()">Logout</button>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="dashboard-section">
+            <h2>Book Management</h2>
+            <div style="background: #f9f9f9; padding: 15px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #ddd;">
+                <h3>Add New Book</h3>
+                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                    <input type="text" id="newTitle" placeholder="Title" style="padding:8px; flex:1;">
+                    <input type="text" id="newAuthor" placeholder="Author" style="padding:8px; flex:1;">
+                    <input type="text" id="newCategory" placeholder="Category" style="padding:8px; flex:1;">
+                    <input type="text" id="newIsbn" placeholder="ISBN" style="padding:8px; width:150px;">
+                    <input type="number" id="newCopies" placeholder="Total Copies" value="1" style="padding:8px; width:100px;">
+                    <button class="action-btn" onclick="addBook()">Add Book</button>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Category</th>
+                        <th>ISBN</th>
+                        <th>Copies</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="booksTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="dashboard-section">
+            <h2>All Transactions</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Book</th>
+                        <th>Issue Date</th>
+                        <th>Due Date</th>
+                        <th>Return Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="dashboard-section">
+            <h2>All Fines</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Book</th>
+                        <th>Amount (₹)</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="finesTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="dashboard-section">
+            <h2>All Users</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            window.location.href = '/login';
+        }
+
+        function openPasswordModal() {
+            document.getElementById('passwordModal').style.display = 'flex';
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+        }
+
+        async function submitPasswordChange() {
+            const old_password = document.getElementById('oldPassword').value;
+            const new_password = document.getElementById('newPassword').value;
+            if (!old_password || !new_password) {
+                alert('Please fill in both fields');
+                return;
+            }
+            const res = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ old_password, new_password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                closePasswordModal();
+            } else {
+                alert(data.error);
+            }
+        }
+
+        function openRegisterAdminModal() {
+            document.getElementById('registerAdminModal').style.display = 'flex';
+            document.getElementById('adminName').value = '';
+            document.getElementById('adminEmail').value = '';
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function closeRegisterAdminModal() {
+            document.getElementById('registerAdminModal').style.display = 'none';
+        }
+
+        async function submitRegisterAdmin() {
+            const name = document.getElementById('adminName').value;
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            if (!name || !email || !password) {
+                alert('Please fill in all fields');
+                return;
+            }
+            const res = await fetch('/api/register-admin', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name, email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                closeRegisterAdminModal();
+                loadUsers();
+            } else {
+                alert(data.error);
+            }
+        }
+        const CURRENT_USER_ID = {{ session['user_id'] }};
+
+        async function loadUsers() {
+            const res = await fetch('/api/users');
+            const users = await res.json();
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            users.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-aos', 'fade-up');
+                let actionBtn = (u.id === CURRENT_USER_ID || u.name === 'Deleted User') ? '-' : `<button class="btn btn-sm" style="background: #e74c3c; color: white;" onclick="removeUser(${u.id})">Remove User</button>`;
+                tr.innerHTML = `
+                    <td>${u.name}</td>
+                    <td>${u.email}</td>
+                    <td>${u.role === 'admin' ? 'Admin' : 'Student'}</td>
+                    <td>${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            setTimeout(() => AOS.refresh(), 100);
+        }
+
+        async function removeUser(userId) {
+            if(!confirm("Are you sure you want to remove this user's details?")) return;
+            const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+            if (res.ok) {
+                loadUsers();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Failed to remove user");
+            }
+        }
+
+        async function loadBooks() {
+            const res = await fetch(`/api/books`);
+            const books = await res.json();
+            
+            const tbody = document.getElementById('booksTableBody');
+            tbody.innerHTML = '';
+            
+            books.forEach(b => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-aos', 'fade-up');
+                tr.innerHTML = `
+                    <td>${b.title}</td>
+                    <td>${b.author}</td>
+                    <td>${b.category}</td>
+                    <td>${b.isbn}</td>
+                    <td>
+                        <input type="number" id="copies_${b.id}" value="${b.total_copies}" style="width:60px; padding:3px;">
+                    </td>
+                    <td>
+                        <button class="action-btn edit" onclick="updateBook(${b.id})">Save</button>
+                        <button class="action-btn delete" onclick="deleteBook(${b.id})">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            setTimeout(() => AOS.refresh(), 100);
+        }
+
+        async function addBook() {
+            const title = document.getElementById('newTitle').value;
+            const author = document.getElementById('newAuthor').value;
+            const category = document.getElementById('newCategory').value;
+            const isbn = document.getElementById('newIsbn').value;
+            const total_copies = parseInt(document.getElementById('newCopies').value);
+            
+            if(!title || !author || !category || !isbn) return showToast("Fill all fields", "error");
+
+            const res = await fetch('/api/books', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, author, category, isbn, total_copies })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast("Book added", "success");
+                document.getElementById('newTitle').value = '';
+                document.getElementById('newAuthor').value = '';
+                document.getElementById('newCategory').value = '';
+                document.getElementById('newIsbn').value = '';
+                loadBooks();
+            } else showToast(data.error, "error");
+        }
+
+        async function updateBook(id) {
+            const copies = parseInt(document.getElementById(`copies_${id}`).value);
+            const res = await fetch(`/api/books/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ total_copies: copies })
+            });
+            const data = await res.json();
+            if(res.ok) {
+                showToast("Book updated", "success");
+                loadBooks();
+            } else showToast(data.error, "error");
+        }
+
+        async function deleteBook(id) {
+            if(!confirm("Are you sure?")) return;
+            const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
+            if(res.ok) {
+                showToast("Book deleted", "success");
+                loadBooks();
+            } else showToast("Failed to delete book", "error");
+        }
+
+        async function loadTransactions() {
+            const res = await fetch('/api/transactions');
+            const txs = await res.json();
+            
+            const tbody = document.getElementById('transactionsTableBody');
+            tbody.innerHTML = '';
+            
+            txs.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-aos', 'fade-up');
+                tr.innerHTML = `
+                    <td>${t.id}</td>
+                    <td>${t.user_name}</td>
+                    <td>${t.book_title}</td>
+                    <td>${t.issue_date}</td>
+                    <td>${t.due_date}</td>
+                    <td>${t.return_date || '-'}</td>
+                    <td>${t.status}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            setTimeout(() => AOS.refresh(), 100);
+        }
+
+        async function loadFines() {
+            const res = await fetch('/api/fines');
+            const fines = await res.json();
+            
+            const tbody = document.getElementById('finesTableBody');
+            tbody.innerHTML = '';
+            
+            fines.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-aos', 'fade-up');
+                let actionBtn = f.paid_status ? `<button class="btn btn-sm" onclick="markFineUnpaid(${f.id})">Mark Unpaid</button>` : `<button class="btn btn-sm" onclick="markFinePaid(${f.id})">Mark Paid</button>`;
+                tr.innerHTML = `
+                    <td>${f.id}</td>
+                    <td>${f.user_name}</td>
+                    <td>${f.book_title}</td>
+                    <td>₹${f.amount}</td>
+                    <td>${f.paid_status ? 'Paid' : 'Unpaid'}</td>
+                    <td>${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            setTimeout(() => AOS.refresh(), 100);
+        }
+
+        async function markFinePaid(fineId) {
+            if(!confirm("Mark this fine as paid?")) return;
+            const res = await fetch(`/api/fines/${fineId}/pay`, { method: 'POST' });
+            if (res.ok) {
+                loadFines();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Failed to mark as paid");
+            }
+        }
+
+        async function markFineUnpaid(fineId) {
+            if(!confirm("Mark this fine as unpaid?")) return;
+            const res = await fetch(`/api/fines/${fineId}/unpay`, { method: 'POST' });
+            if (res.ok) {
+                loadFines();
+            } else {
+                const data = await res.json();
+                alert(data.error || "Failed to mark as unpaid");
+            }
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            AOS.init({ once: true, duration: 500 });
+            loadBooks();
+            loadTransactions();
+            loadFines();
+            loadUsers();
+            
+            gsap.from(".dashboard-section", { 
+                y: 20, 
+                opacity: 0, 
+                duration: 0.4, 
+                stagger: 0.1 
+            });
+            gsap.from("header", { y: -20, opacity: 0, duration: 0.4 });
+        });
+    </script>
+</body>
+</html>

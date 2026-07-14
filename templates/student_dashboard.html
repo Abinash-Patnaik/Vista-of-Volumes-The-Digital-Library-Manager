@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Dashboard - Digital Library</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+    <script src="/static/js/main.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+    <style>
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #fff; padding: 2rem; border-radius: 12px;
+            width: 90%; max-width: 400px; color: #333;
+        }
+        .modal-content h2 { margin-top: 0; color: #333; }
+        .modal-content input { width: 100%; margin-bottom: 1rem; padding: 0.8rem; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+        .modal-content .modal-btns { display: flex; gap: 1rem; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <div id="passwordModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Change Password</h2>
+            <input type="password" id="oldPassword" placeholder="Old Password">
+            <input type="password" id="newPassword" placeholder="New Password">
+            <div class="modal-btns">
+                <button onclick="closePasswordModal()" style="background: #ccc; color: #333;">Cancel</button>
+                <button onclick="submitPasswordChange()">Change</button>
+            </div>
+        </div>
+    </div>
+
+    <header>
+        <h1>Digital Library</h1>
+        <nav>
+            <span style="margin-right: 15px;">Student Dashboard</span>
+            <button onclick="openPasswordModal()" style="margin-right: 10px;">Change Password</button>
+            <button onclick="logout()">Logout</button>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('find-books', this)">All Books</button>
+            <button class="tab-btn" onclick="switchTab('my-books', this)">My Issued Books</button>
+            <button class="tab-btn" onclick="switchTab('my-fines', this)">My Fines</button>
+        </div>
+
+        <div id="find-books" class="dashboard-section tab-content active">
+            <h2>Find Books</h2>
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search by title, author, or category...">
+                <button onclick="loadBooks()">Search</button>
+            </div>
+            <div id="bookGrid" class="book-grid"></div>
+        </div>
+
+        <div id="my-books" class="dashboard-section tab-content">
+            <h2>My Issued Books</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Issue Date</th>
+                        <th>Due Date</th>
+                        <th>Return Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="issuedBooksTableBody"></tbody>
+            </table>
+        </div>
+
+        <div id="my-fines" class="dashboard-section tab-content">
+            <h2>My Fines</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Book Title</th>
+                        <th>Amount (₹)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="finesTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            window.location.href = '/login';
+        }
+
+        function openPasswordModal() {
+            document.getElementById('passwordModal').style.display = 'flex';
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+        }
+
+        async function submitPasswordChange() {
+            const old_password = document.getElementById('oldPassword').value;
+            const new_password = document.getElementById('newPassword').value;
+            if (!old_password || !new_password) {
+                alert('Please fill in both fields');
+                return;
+            }
+            const res = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ old_password, new_password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                closePasswordModal();
+            } else {
+                alert(data.error);
+            }
+        }
+
+        function switchTab(tabId, btn) {
+            const currentTab = document.querySelector('.tab-content.active');
+            if (currentTab.id === tabId) return;
+
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            gsap.to(currentTab, {
+                opacity: 0,
+                y: -10,
+                duration: 0.2,
+                onComplete: () => {
+                    currentTab.classList.remove('active');
+                    const newTab = document.getElementById(tabId);
+                    newTab.classList.add('active');
+                    gsap.fromTo(newTab, 
+                        { opacity: 0, y: 10 }, 
+                        { opacity: 1, y: 0, duration: 0.3, onComplete: () => AOS.refresh() }
+                    );
+                }
+            });
+        }
+
+        async function loadBooks() {
+            const query = document.getElementById('searchInput').value;
+            const res = await fetch(`/api/books?search=${encodeURIComponent(query)}`);
+            const books = await res.json();
+            
+            const grid = document.getElementById('bookGrid');
+            grid.innerHTML = '';
+            
+            books.forEach(b => {
+                const card = document.createElement('div');
+                card.className = 'book-card';
+                card.setAttribute('data-aos', 'fade-up');
+                card.innerHTML = `
+                    <h3>${b.title}</h3>
+                    <p><strong>Author:</strong> ${b.author}</p>
+                    <p><strong>Category:</strong> ${b.category}</p>
+                    <p><strong>Available:</strong> ${b.available_copies} / ${b.total_copies}</p>
+                    <div class="card-actions">
+                        <button class="action-btn" onclick="issueBook(${b.id})" ${b.available_copies <= 0 ? 'disabled' : ''}>
+                            Issue
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            
+            setTimeout(() => AOS.refresh(), 100);
+        }
+
+        async function issueBook(book_id) {
+            const res = await fetch('/api/issue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book_id })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast("Book issued successfully!", "success");
+                loadBooks();
+                loadMyTransactions();
+            } else {
+                showToast("Error: " + data.error, "error");
+            }
+        }
+
+        async function loadMyTransactions() {
+            const res = await fetch('/api/transactions');
+            const txs = await res.json();
+            
+            const tbody = document.getElementById('issuedBooksTableBody');
+            tbody.innerHTML = '';
+            
+            txs.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-aos', 'fade-up');
+                tr.innerHTML = `
+                    <td>${t.book_title}</td>
+                    <td>${t.issue_date}</td>
+                    <td>${t.due_date}</td>
+                    <td>${t.return_date || '-'}</td>
+                    <td>${t.status}</td>
+                    <td>
+                        ${t.status === 'issued' ? `<button class="action-btn edit" onclick="returnBook(${t.id})">Return</button>` : 'Returned'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            setTimeout(() => AOS.refresh(), 100);
+        }
+
+        async function returnBook(tx_id) {
+            const res = await fetch('/api/return', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transaction_id: tx_id })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                const fineMsg = data.fine_amount ? ` Fine of ₹${data.fine_amount} applied.` : '';
+                showToast(data.message + fineMsg, "success");
+                loadBooks();
+                loadMyTransactions();
+                loadMyFines();
+            } else {
+                showToast("Error: " + data.error, "error");
+            }
+        }
+
+        async function loadMyFines() {
+            const res = await fetch('/api/fines');
+            const fines = await res.json();
+            
+            const tbody = document.getElementById('finesTableBody');
+            tbody.innerHTML = '';
+            
+            fines.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-aos', 'fade-up');
+                tr.innerHTML = `
+                    <td>${f.book_title}</td>
+                    <td>₹${f.amount}</td>
+                    <td>${f.paid_status ? '<span style="color:green">Paid</span>' : '<span style="color:red">Unpaid</span>'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            setTimeout(() => AOS.refresh(), 100);
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            AOS.init({ once: true, duration: 500 });
+            loadBooks();
+            loadMyTransactions();
+            loadMyFines();
+            
+            // GSAP initial load animation
+            gsap.from(".tab-content.active", { y: 20, opacity: 0, duration: 0.4 });
+            gsap.from("header", { y: -20, opacity: 0, duration: 0.4 });
+        });
+    </script>
+</body>
+</html>
