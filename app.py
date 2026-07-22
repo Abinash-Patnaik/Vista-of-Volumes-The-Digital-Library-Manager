@@ -111,7 +111,7 @@ def seed_database():
     db.session.commit()
     print("Database seeded successfully!")
 
-    with app.app_context():
+with app.app_context():
     db.create_all()
     seed_database()
 
