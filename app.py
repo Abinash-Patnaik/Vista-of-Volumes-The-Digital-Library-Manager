@@ -111,6 +111,10 @@ def seed_database():
     db.session.commit()
     print("Database seeded successfully!")
 
+    with app.app_context():
+    db.create_all()
+    seed_database()
+
 @app.route('/')
 def index():
     if 'user_id' in session:
@@ -526,11 +530,6 @@ def mark_fine_unpaid(id):
     return jsonify({"message": "Fine marked as unpaid successfully"}), 200
 
 if __name__ == '__main__':
-    with app.app_context():
-        # Create tables on first run
-        db.create_all()
-        # Seed database
-        seed_database()
     
     # Run the Flask app
     app.run(host='0.0.0.0', debug=True, port=5000)
